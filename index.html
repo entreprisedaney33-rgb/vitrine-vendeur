@@ -326,9 +326,9 @@
     // envoie au client son lien de paiement de la boutique, code promo déjà appliqué (750 € → 490 €).
     if (lienPaiement){
       var pb = el('div', 'box');
-      var pt = el('button', 'toggle', '🛒 Lien de paiement (site à 490 €)'); pt.type = 'button';
+      var pt = el('button', 'toggle', '🛒 Lien de paiement (499 € puis 9 €/mois)'); pt.type = 'button';
       var pf = el('div', 'fields');
-      pf.appendChild(el('span', 'mention', 'À envoyer au client quand il veut acheter (par SMS ou par mail). Il arrive directement sur la page de paiement : 750 € barrés, 490 € avec ton code déjà appliqué.'));
+      pf.appendChild(el('span', 'mention', 'À envoyer au client quand il veut acheter (par SMS ou par mail). Il arrive directement sur la page de paiement : le site à 490 € (750 € barrés, ton code déjà appliqué) + l’hébergement à 9 € par mois, soit 499 € aujourd’hui puis 9 € par mois.'));
       var pr = el('div', 'result open'); var pu = el('span', null, lienPaiement);
       var pc = el('button', null, '📋 Copier'); pc.type = 'button';
       pr.appendChild(pu); pr.appendChild(pc); pf.appendChild(pr);
