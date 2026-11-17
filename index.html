@@ -227,28 +227,12 @@
 
   // ---------- Cockpit ----------
   var listEl = document.getElementById('list');
-  var tous = [], ongletActif = 'nouveaux', demandes = [], plafond = null, minuteur = null;
+  var tous = [], ongletActif = 'nouveaux', demandes = [], plafond = null, minuteur = null, lienPaiement = '';
   var LIBELLES = { pisciniste:'piscinistes', paysagiste:'paysagistes', 'menuisier-agenceur':'menuisiers agenceurs', verandas:'vérandistes', 'salles-de-bains':'salles de bains' };
   var EN_COURS = ['recherche', 'en_file', 'en_preparation'];
   var STATUTS = [
     { v:'a_appeler', label:'À appeler' }, { v:'appele', label:'Appelé' }, { v:'achete', label:'Acheté' },
     { v:'a_relancer', label:'À relancer' }, { v:'perdu', label:'Perdu' }
-  ];
-  // Memes cles et prix que le catalogue cote serveur (noeud « Preparer devis » du cockpit) :
-  // le serveur ignore toute cle inconnue et reprend ses propres prix.
-  var OPTIONS_DEVIS = [
-    { cle:'base_1_page', titre:'Site web professionnel (1 page)', prix:490 },
-    { cle:'page_supp', titre:'Page supplémentaire', prix:250, qte:true },
-    { cle:'google_business', titre:'Fiche Google Business', prix:199 },
-    { cle:'devis_interactif', titre:'Formulaire de devis interactif', prix:129 },
-    { cle:'logo', titre:'Logo / identité visuelle', prix:219 },
-    { cle:'galerie_avancee', titre:'Galerie de réalisations avancée', prix:99 },
-    { cle:'email_pro', titre:'Adresses email pro', prix:49 },
-    { cle:'avis_widget', titre:'Avis Google intégrés (widget)', prix:49 },
-    { cle:'rdv_ligne', titre:'Prise de rendez-vous en ligne', prix:149 },
-    { cle:'reseaux_sociaux', titre:'Réseaux sociaux (pages pro)', prix:99 },
-    { cle:'badges_confiance', titre:'Badges de confiance BTP', prix:49 },
-    { cle:'multilingue', titre:'Multilingue (par langue)', prix:149 }
   ];
   var ONGLETS = {
     // Lecture generique : tout statut inconnu (ex. futurs statuts du moteur vitrine) tombe dans
@@ -338,55 +322,25 @@
     });
     mb.appendChild(mt); mb.appendChild(mf); card.appendChild(mb);
 
-    // Devis : options cochees au telephone -> lien de paiement Shopify a copier
-    var db = el('div', 'box');
-    var dt = el('button', 'toggle', s.devis_url ? '🧾 Revoir le devis' : '🧾 Créer un devis'); dt.type = 'button';
-    var df = el('div', 'fields');
-    var cases = [];
-    OPTIONS_DEVIS.forEach(function(o){
-      var row = el('label', 'opt');
-      var chk = el('input'); chk.type = 'checkbox';
-      row.appendChild(chk); row.appendChild(el('span', 't', o.titre)); row.appendChild(el('span', 'p', o.prix + ' €'));
-      var q = null;
-      if (o.qte){ q = el('input', 'q'); q.type = 'number'; q.min = '1'; q.value = '1'; q.setAttribute('aria-label', 'Nombre de pages'); row.appendChild(q); }
-      df.appendChild(row); cases.push({ cle:o.cle, chk:chk, q:q });
-    });
-    var lr = el('div', 'libre');
-    var lt = el('input'); lt.type = 'text'; lt.placeholder = 'Autre / sur devis (ex : vidéo drone)';
-    var lp = el('input'); lp.type = 'number'; lp.min = '0'; lp.placeholder = '€';
-    lr.appendChild(lt); lr.appendChild(lp); df.appendChild(lr);
-    var dg = el('button', 'go', 'Générer le lien de paiement'); dg.type = 'button'; df.appendChild(dg);
-    var dr = el('div', 'result'); var du = el('span'); var dc = el('button', null, '📋 Copier'); dc.type = 'button';
-    dr.appendChild(du); dr.appendChild(dc); df.appendChild(dr);
-    if (s.devis_url){ du.textContent = s.devis_url; dr.classList.add('open'); }
-    dc.addEventListener('click', function(){
-      if (!du.textContent) return;
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(du.textContent);
-      toast('📋 Lien copié');
-    });
-    dt.addEventListener('click', function(){ df.classList.toggle('open'); });
-    dg.addEventListener('click', function(){
-      var lignes = [];
-      cases.forEach(function(c){
-        if (!c.chk.checked) return;
-        var l = { cle:c.cle };
-        if (c.q){ var n = parseInt(c.q.value, 10); l.quantite = (isFinite(n) && n > 0) ? n : 1; }
-        lignes.push(l);
+    // Encaissement (décision de Mathéo, 17/11/2026) : PAS de devis dans l'espace vendeur ; le vendeur
+    // envoie au client son lien de paiement de la boutique, code promo déjà appliqué (750 € → 490 €).
+    if (lienPaiement){
+      var pb = el('div', 'box');
+      var pt = el('button', 'toggle', '🛒 Lien de paiement (site à 490 €)'); pt.type = 'button';
+      var pf = el('div', 'fields');
+      pf.appendChild(el('span', 'mention', 'À envoyer au client quand il veut acheter (par SMS ou par mail). Il arrive directement sur la page de paiement : 750 € barrés, 490 € avec ton code déjà appliqué.'));
+      var pr = el('div', 'result open'); var pu = el('span', null, lienPaiement);
+      var pc = el('button', null, '📋 Copier'); pc.type = 'button';
+      pr.appendChild(pu); pr.appendChild(pc); pf.appendChild(pr);
+      var po = el('a', 'demo', '👁 Ouvrir pour vérifier'); po.href = lienPaiement; po.target = '_blank'; po.rel = 'noopener';
+      pf.appendChild(po);
+      pc.addEventListener('click', function(){
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(lienPaiement);
+        toast('📋 Lien de paiement copié');
       });
-      var libre = null, t = lt.value.trim(), p = parseFloat(lp.value);
-      if (t && isFinite(p) && p >= 0) libre = { titre:t, prix:p };
-      if (!lignes.length && !libre){ toast('Coche au moins une option, ou remplis la ligne libre.'); return; }
-      dg.disabled = true; dg.textContent = '…';
-      var payload = { type:'devis', place_id:s.place_id, lignes:lignes };
-      if (libre) payload.ligne_libre = libre;
-      post(payload, function(r){
-        dg.disabled = false; dg.textContent = 'Générer le lien de paiement';
-        du.textContent = r.devis_url || ''; dr.classList.add('open'); dt.textContent = '🧾 Revoir le devis';
-        toast('✅ Devis créé (' + (r.total || '') + ' €) : lien prêt à copier');
-        rafraichir();
-      }, function(err){ dg.disabled = false; dg.textContent = 'Générer le lien de paiement'; toast(err); });
-    });
-    db.appendChild(dt); db.appendChild(df); card.appendChild(db);
+      pt.addEventListener('click', function(){ pf.classList.toggle('open'); });
+      pb.appendChild(pt); pb.appendChild(pf); card.appendChild(pb);
+    }
 
     // Statut de vente.
     var sa = el('div', 'statuts');
@@ -461,7 +415,7 @@
 
   function charger(onOk, onErr){
     post({ type:'list' }, function(j){
-      tous = j.sites || []; demandes = j.demandes || []; plafond = j.plafond || null;
+      tous = j.sites || []; demandes = j.demandes || []; plafond = j.plafond || null; lienPaiement = j.lien_paiement || '';
       majPlafond(); afficher();
       // Tant qu'une demande est en préparation, on rafraîchit toute seule la liste chaque minute.
       clearTimeout(minuteur);
