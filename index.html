@@ -47,6 +47,7 @@
   #head b{font-size:16px; flex:1}
   .hbtn{width:36px; height:36px; border-radius:50%; border:0; background:var(--surface); color:var(--ink);
     display:flex; align-items:center; justify-content:center}
+  .hbtn.txt{width:auto; border-radius:999px; padding:0 12px; font-size:13px}
   #refresh.spin svg{animation:spin 1s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
   #tabs{flex:0 0 auto; display:flex; gap:8px; padding:10px 16px; overflow-x:auto}
@@ -116,7 +117,7 @@
   <div id="head">
     <b>🏗️ Sites Vitrine</b>
     <button id="refresh" class="hbtn" type="button" aria-label="Actualiser"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 10a7 7 0 1 1-2-4.9M17 3v4h-4"/></svg></button>
-    <button id="logout" class="hbtn" type="button" aria-label="Se déconnecter">⎋</button>
+    <button id="logout" class="hbtn txt" type="button">Quitter</button>
   </div>
   <div id="tabs">
     <button class="tab active" data-tab="nouveaux" type="button">🆕 À appeler<span class="n"></span></button>
