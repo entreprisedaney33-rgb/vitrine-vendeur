@@ -100,6 +100,20 @@
     background:#2C2C2E; color:var(--ink); padding:11px 16px; border-radius:12px; font-size:14px; opacity:0;
     transition:opacity .2s, transform .2s; pointer-events:none; max-width:calc(100% - 32px); text-align:center; z-index:10}
   #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  /* Bouton « + » et demandes en préparation (moteur vitrine, lot 6, 17/11/2026) */
+  #ajout{display:none; background:var(--gold-a); color:var(--gold-ink); font-size:22px; font-weight:700; line-height:1}
+  #ajout.ok{display:flex}
+  #demande{display:none; flex-direction:column; gap:8px; margin:4px 16px 8px; padding:14px; border-radius:14px; background:var(--surface)}
+  #demande.open{display:flex}
+  #demande b{font-size:15px}
+  #demande select, #demande input{width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--hairline); background:var(--bg); color:var(--ink); font-size:15px}
+  #demande .rangee{display:flex; gap:8px}
+  #demande .rangee select{flex:1; min-width:0}
+  #demande .rangee input{flex:0 0 84px; text-align:center}
+  .prep{background:var(--surface); border-radius:14px; padding:12px 14px; margin-bottom:12px; font-size:13.5px}
+  .prep .l{display:flex; justify-content:space-between; gap:10px; padding:3px 0}
+  .prep .l span:last-child{color:var(--muted); text-align:right}
+  .mention{font-size:12px; color:var(--muted); line-height:1.4}
   @media (prefers-reduced-motion: reduce){#toast{transition:none} #refresh.spin svg{animation:none}}
 </style>
 </head>
@@ -116,6 +130,7 @@
 <div id="app">
   <div id="head">
     <b>🏗️ Sites Vitrine</b>
+    <button id="ajout" class="hbtn" type="button" aria-label="Demander de nouveaux sites">+</button>
     <button id="refresh" class="hbtn" type="button" aria-label="Actualiser"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 10a7 7 0 1 1-2-4.9M17 3v4h-4"/></svg></button>
     <button id="logout" class="hbtn txt" type="button">Quitter</button>
   </div>
@@ -124,6 +139,21 @@
     <button class="tab" data-tab="encours" type="button">📞 En cours<span class="n"></span></button>
     <button class="tab" data-tab="clients" type="button">✅ Clients<span class="n"></span></button>
     <button class="tab" data-tab="perdus" type="button">❌ Perdus<span class="n"></span></button>
+  </div>
+  <div id="demande">
+    <b>Nouveaux sites à préparer</b>
+    <div class="rangee">
+      <select id="dm-metier" aria-label="Métier">
+        <option value="pisciniste">Piscinistes</option>
+        <option value="paysagiste">Paysagistes</option>
+        <option value="menuisier-agenceur">Menuisiers agenceurs</option>
+        <option value="verandas">Vérandas</option>
+        <option value="salles-de-bains">Salles de bains</option>
+      </select>
+      <input id="dm-nombre" type="number" min="1" value="5" inputmode="numeric" aria-label="Nombre de sites">
+    </div>
+    <span id="dm-reste" class="mention"></span>
+    <button id="dm-go" class="go" type="button">Lancer la recherche</button>
   </div>
   <div id="list"></div>
 </div>
@@ -197,7 +227,9 @@
 
   // ---------- Cockpit ----------
   var listEl = document.getElementById('list');
-  var tous = [], ongletActif = 'nouveaux';
+  var tous = [], ongletActif = 'nouveaux', demandes = [], plafond = null, minuteur = null;
+  var LIBELLES = { pisciniste:'piscinistes', paysagiste:'paysagistes', 'menuisier-agenceur':'menuisiers agenceurs', verandas:'vérandistes', 'salles-de-bains':'salles de bains' };
+  var EN_COURS = ['recherche', 'en_file', 'en_preparation'];
   var STATUTS = [
     { v:'a_appeler', label:'À appeler' }, { v:'appele', label:'Appelé' }, { v:'achete', label:'Acheté' },
     { v:'a_relancer', label:'À relancer' }, { v:'perdu', label:'Perdu' }
@@ -285,7 +317,11 @@
     var mo = el('input'); mo.type = 'text'; mo.placeholder = 'Objet'; mo.value = s.mail_objet || '';
     var mc = el('textarea'); mc.rows = 8; mc.value = s.mail_corps || '';
     var ms = el('button', 'go', deja ? '✉️ Renvoyer le mail' : '✉️ Envoyer le mail'); ms.type = 'button';
-    mf.appendChild(me); mf.appendChild(mo); mf.appendChild(mc); mf.appendChild(ms);
+    mf.appendChild(me); mf.appendChild(mo); mf.appendChild(mc);
+    // Aperçu du moteur : le serveur ajoute sous le texte une mention fixe (gratuit, sans engagement,
+    // date de retrait) ; on la montre pour que le vendeur sache ce que le prospect lira.
+    if (s.moteur && s.mention_retrait) mf.appendChild(el('span', 'mention', 'Ajouté automatiquement sous le texte : ' + s.mention_retrait));
+    mf.appendChild(ms);
     if (deja) mf.appendChild(el('span', 'done', '✅ Mail déjà envoyé'));
     mt.addEventListener('click', function(){ mf.classList.toggle('open'); });
     if (!demoOk){
@@ -362,7 +398,7 @@
         b.addEventListener('click', function(){
           b.disabled = true;
           post({ type:'statut', place_id:s.place_id, statut_vente:'perdu' }, function(){
-            toast('Prospect marqué perdu (la démo reste en ligne)'); rafraichir();
+            toast(s.moteur ? 'Prospect marqué perdu : son aperçu sera retiré cette nuit' : 'Prospect marqué perdu (la démo reste en ligne)'); rafraichir();
           }, function(err){ b.disabled = false; toast(err); });
         });
       } else {
@@ -384,16 +420,72 @@
       b.querySelector('.n').textContent = n ? '(' + n + ')' : '';
     });
     listEl.innerHTML = '';
+    if (ongletActif === 'nouveaux') afficherDemandes();
     var sites = tous.filter(ONGLETS[ongletActif] || ONGLETS.nouveaux);
     if (!sites.length){ listEl.appendChild(el('p', 'empty', 'Rien ici pour l’instant.')); return; }
     sites.forEach(function(s){ listEl.appendChild(carte(s)); });
   }
 
+  // Demandes « + » du jour : en préparation, prêtes, ou impossibles (avec la raison du serveur).
+  function afficherDemandes(){
+    if (!demandes.length) return;
+    var box = el('div', 'prep');
+    demandes.forEach(function(d){
+      var lib = d.nombre + ' ' + (LIBELLES[d.metier] || d.metier);
+      var etat;
+      if (d.statut === 'recherche') etat = '🔎 recherche des entreprises…';
+      else if (EN_COURS.indexOf(d.statut) >= 0) etat = '⏳ en préparation : ' + d.prets + ' prêt' + (d.prets > 1 ? 's' : '') + ' sur ' + (d.trouves || d.nombre);
+      else if (d.statut === 'prete') etat = '✅ prêts (' + d.prets + ')';
+      else if (d.statut === 'partielle') etat = '✅ ' + d.prets + ' prêt' + (d.prets > 1 ? 's' : '') + ' (pas plus trouvé)';
+      else etat = '⚠️ ' + (d.message || 'aucun site préparé');
+      var l = el('div', 'l'); l.appendChild(el('span', null, lib)); l.appendChild(el('span', null, etat));
+      box.appendChild(l);
+    });
+    listEl.appendChild(box);
+  }
+
+  function majPlafond(){
+    var b = document.getElementById('ajout');
+    var ouvert = !!(plafond && plafond.ouvert);
+    b.classList.toggle('ok', ouvert);
+    if (!ouvert) document.getElementById('demande').classList.remove('open');
+    if (!plafond) return;
+    var n = document.getElementById('dm-nombre');
+    n.max = String(Math.max(1, plafond.sites_restants));
+    if (Number(n.value) > plafond.sites_restants) n.value = String(Math.max(1, plafond.sites_restants));
+    document.getElementById('dm-reste').textContent = plafond.sites_restants > 0 && plafond.demandes_restantes > 0
+      ? 'Encore ' + plafond.sites_restants + ' site' + (plafond.sites_restants > 1 ? 's' : '') + ' et ' + plafond.demandes_restantes + ' demande' + (plafond.demandes_restantes > 1 ? 's' : '') + ' possibles aujourd’hui. Compter environ 4 minutes par site.'
+      : 'Plafond du jour atteint : vous pourrez en redemander demain.';
+    document.getElementById('dm-go').disabled = !(plafond.sites_restants > 0 && plafond.demandes_restantes > 0);
+  }
+
   function charger(onOk, onErr){
     post({ type:'list' }, function(j){
-      tous = j.sites || []; afficher(); if (onOk) onOk();
+      tous = j.sites || []; demandes = j.demandes || []; plafond = j.plafond || null;
+      majPlafond(); afficher();
+      // Tant qu'une demande est en préparation, on rafraîchit toute seule la liste chaque minute.
+      clearTimeout(minuteur);
+      if (demandes.some(function(d){ return EN_COURS.indexOf(d.statut) >= 0; })) minuteur = setTimeout(function(){ rafraichir(); }, 60000);
+      if (onOk) onOk();
     }, function(err){ if (onErr) onErr(err); else toast(err); });
   }
+
+  document.getElementById('ajout').addEventListener('click', function(){
+    document.getElementById('demande').classList.toggle('open');
+  });
+  document.getElementById('dm-go').addEventListener('click', function(){
+    var go = document.getElementById('dm-go');
+    var nombre = parseInt(document.getElementById('dm-nombre').value, 10);
+    var metier = document.getElementById('dm-metier').value;
+    if (!isFinite(nombre) || nombre < 1){ toast('Indique un nombre de sites.'); return; }
+    go.disabled = true; go.textContent = '…';
+    post({ type:'demander', metier:metier, nombre:nombre }, function(j){
+      go.textContent = 'Lancer la recherche';
+      document.getElementById('demande').classList.remove('open');
+      toast(j.message || 'Recherche lancée');
+      rafraichir();
+    }, function(err){ go.disabled = false; go.textContent = 'Lancer la recherche'; toast(err); });
+  });
   function rafraichir(onDone){
     charger(onDone, function(err){ toast(err); if (onDone) onDone(); });
   }
