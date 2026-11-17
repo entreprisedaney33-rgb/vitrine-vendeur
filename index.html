@@ -219,7 +219,9 @@
     { cle:'multilingue', titre:'Multilingue (par langue)', prix:149 }
   ];
   var ONGLETS = {
-    nouveaux: function(s){ return !s.statut_vente || s.statut_vente === 'a_appeler'; },
+    // Lecture generique : tout statut inconnu (ex. futurs statuts du moteur vitrine) tombe dans
+    // « À appeler » plutot que de disparaitre. Le serveur decide de ce qui est renvoye.
+    nouveaux: function(s){ return !ONGLETS.encours(s) && !ONGLETS.clients(s) && !ONGLETS.perdus(s); },
     encours: function(s){ return s.statut_vente === 'appele' || s.statut_vente === 'mail_envoye' || s.statut_vente === 'a_relancer'; },
     clients: function(s){ return s.statut_vente === 'achete'; },
     perdus: function(s){ return s.statut_vente === 'perdu'; }
@@ -245,7 +247,10 @@
       var a = el('a', 'demo', '👁 Voir la démo');
       a.href = s.url_demo; a.target = '_blank'; a.rel = 'noopener';
       actions.appendChild(a);
+    } else {
+      actions.appendChild(el('span', 'muted', 'Démo indisponible'));
     }
+    var demoOk = !!s.url_demo && !s.expire && !s.supprime;
     card.appendChild(actions);
     if (s.expire && !s.supprime) card.appendChild(el('span', 'expired', '⏱ Démo expirée : le lien ne marche plus'));
 
@@ -283,6 +288,10 @@
     mf.appendChild(me); mf.appendChild(mo); mf.appendChild(mc); mf.appendChild(ms);
     if (deja) mf.appendChild(el('span', 'done', '✅ Mail déjà envoyé'));
     mt.addEventListener('click', function(){ mf.classList.toggle('open'); });
+    if (!demoOk){
+      // Pas de demo en ligne : le mail n'aurait rien a montrer. Action visible mais indisponible.
+      mt.disabled = true; mt.textContent = '✉️ Mail indisponible (pas de démo en ligne)'; mt.style.opacity = '.5';
+    }
     ms.addEventListener('click', function(){
       var em = me.value.trim();
       if (!em){ toast('Indique une adresse email d’abord.'); return; }
@@ -343,22 +352,18 @@
     });
     db.appendChild(dt); db.appendChild(df); card.appendChild(db);
 
-    // Statut de vente. « Perdu » supprime le site : deuxieme appui obligatoire.
+    // Statut de vente.
     var sa = el('div', 'statuts');
     STATUTS.forEach(function(st){
       var b = el('button', 'st' + ((s.statut_vente || 'a_appeler') === st.v ? ' active' : ''), st.label); b.type = 'button';
+      // « Perdu » ne change que le statut : depuis l'espace vendeur, le serveur ne supprime
+      // jamais la demo (garde-fou du cockpit, 17/11/2026).
       if (st.v === 'perdu'){
-        var arme = false;
         b.addEventListener('click', function(){
-          if (!arme){
-            arme = true; b.textContent = '⚠️ Sûr ? (supprime le site)';
-            setTimeout(function(){ if (arme){ arme = false; b.textContent = st.label; } }, 4000);
-            return;
-          }
-          arme = false; b.disabled = true; b.textContent = '…';
+          b.disabled = true;
           post({ type:'statut', place_id:s.place_id, statut_vente:'perdu' }, function(){
-            toast('🗑 Prospect marqué perdu, site supprimé'); rafraichir();
-          }, function(err){ b.disabled = false; b.textContent = st.label; toast(err); });
+            toast('Prospect marqué perdu (la démo reste en ligne)'); rafraichir();
+          }, function(err){ b.disabled = false; toast(err); });
         });
       } else {
         b.addEventListener('click', function(){
