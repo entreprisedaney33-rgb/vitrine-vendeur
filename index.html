@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sites Vitrine">
+<title>Sites Vitrine</title>
+<!--
+  Espace vendeur VITRINE (lot 1, 17/11/2026) -- source : produits/vitrine-vendeur/app/index.html
+  du depot labo-ia, publie tel quel sur le depot public `vitrine-vendeur` (GitHub Pages).
+  Ne contient QUE le cockpit de vente des sites vitrines : aucune donnee Jarvis, aucun secret.
+  Le code d'acces est saisi par le vendeur et garde sur SON appareil (localStorage) ; le serveur
+  (webhook `vitrine-vendeur`, workflow 🏠 VITRINE-COCKPIT) ne l'accepte que s'il est dans la table
+  `vendeur_acces`. Inspire de l'onglet VITRINE de jarvis-app, sans recherche ni reactivation.
+-->
+<style>
+  :root{
+    --bg:#000000; --surface:#1C1C1E; --field:#2E2E32; --hairline:rgba(84,84,88,.65);
+    --ink:#FFFFFF; --muted:#98989E; --blue:#0A84FF; --gold-a:#E8B96A; --gold-ink:#1a1200;
+    --note-bg:#F5D67A; --ok:#30D158; --no:#FF453A;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-text-size-adjust:100%}
+  button{font:inherit; cursor:pointer}
+  input,textarea,select{font:inherit}
+  #login{min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:24px 16px; gap:14px; text-align:center}
+  #login h1{font-size:22px; margin:0}
+  #login p{color:var(--muted); font-size:14px; margin:0; max-width:340px}
+  #login input{width:100%; max-width:340px; padding:13px 14px; border-radius:12px; border:1px solid var(--hairline);
+    background:var(--field); color:var(--ink); font-size:16px; text-align:center}
+  #login button{width:100%; max-width:340px; padding:13px; border:0; border-radius:12px; background:var(--gold-a);
+    color:var(--gold-ink); font-weight:700; font-size:16px}
+  #login button:disabled{opacity:.5}
+  #login-err{color:var(--no); font-size:14px; min-height:18px}
+  #app{display:none; flex-direction:column; height:100vh; height:100dvh}
+  #app.open{display:flex}
+  #head{flex:0 0 auto; display:flex; align-items:center; gap:10px;
+    padding:calc(12px + env(safe-area-inset-top)) 16px 10px; border-bottom:1px solid var(--hairline)}
+  #head b{font-size:16px; flex:1}
+  .hbtn{width:36px; height:36px; border-radius:50%; border:0; background:var(--surface); color:var(--ink);
+    display:flex; align-items:center; justify-content:center}
+  #refresh.spin svg{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #tabs{flex:0 0 auto; display:flex; gap:8px; padding:10px 16px; overflow-x:auto}
+  .tab{flex:0 0 auto; padding:8px 12px; border-radius:999px; border:1px solid var(--hairline);
+    background:transparent; color:var(--ink); font-size:13.5px; white-space:nowrap}
+  .tab.active{background:var(--gold-a); color:var(--gold-ink); border-color:var(--gold-a); font-weight:600}
+  .tab .n{opacity:.7; margin-left:4px}
+  #list{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:6px 16px calc(24px + env(safe-area-inset-bottom))}
+  .empty{color:var(--muted); text-align:center; padding:40px 20px; font-size:14px}
+  .card{background:var(--surface); border-radius:14px; padding:14px; margin-bottom:12px}
+  .nom{font-size:15px; font-weight:600; display:block; margin-bottom:2px}
+  .meta{font-size:12.5px; color:var(--muted); display:block; margin-bottom:10px}
+  .actions{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px}
+  .tel{font-size:14px; color:var(--blue); text-decoration:none; padding:8px 4px}
+  .muted{color:var(--muted); font-size:13px}
+  .demo{font-size:13px; padding:8px 12px; border-radius:999px; background:var(--field); color:var(--ink);
+    text-decoration:none; border:0}
+  .expired{font-size:12px; color:var(--no); font-weight:600; display:block; margin-bottom:10px}
+  .box{margin-bottom:10px}
+  .toggle{width:100%; text-align:left; padding:10px 12px; border-radius:10px; border:0;
+    background:var(--field); color:var(--ink); font-size:13.5px}
+  .fields{display:none; flex-direction:column; gap:6px; margin-top:8px}
+  .fields.open{display:flex}
+  .fields input, .fields textarea{width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--hairline);
+    background:var(--bg); color:var(--ink); font-size:15px}
+  .fields textarea{resize:vertical; line-height:1.45}
+  .go{padding:11px; border:0; border-radius:10px; background:var(--gold-a); color:var(--gold-ink); font-weight:700; font-size:14.5px}
+  .go:disabled{opacity:.5}
+  .done{font-size:12px; color:var(--ok); font-weight:600}
+  .note{width:100%; text-align:left; padding:10px 12px; border-radius:10px; border:0; font-size:13.5px;
+    background:var(--note-bg); color:#1a1200; white-space:pre-wrap; word-break:break-word}
+  .note.vide{background:transparent; color:var(--muted); border:1px dashed var(--hairline)}
+  .opt{display:flex; align-items:center; gap:10px; font-size:13.5px; padding:4px 0}
+  .opt input[type=checkbox]{flex:0 0 auto; width:18px; height:18px; margin:0}
+  .opt .t{flex:1}
+  .opt .p{color:var(--muted); font-size:12.5px; flex:0 0 auto}
+  .opt .q{flex:0 0 54px !important; width:54px !important; text-align:center; padding:6px !important}
+  .libre{display:flex; gap:8px}
+  .libre input:first-child{flex:1; min-width:0}
+  .libre input:last-child{flex:0 0 76px; text-align:center}
+  .result{display:none; align-items:center; gap:8px; padding:8px 10px; border-radius:10px; background:var(--bg)}
+  .result.open{display:flex}
+  .result span{flex:1; min-width:0; font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .result button{border:0; border-radius:8px; padding:6px 10px; background:var(--field); color:var(--ink); font-size:12.5px}
+  .statuts{display:flex; gap:8px; flex-wrap:wrap}
+  .st{padding:7px 11px; border-radius:999px; border:1px solid var(--hairline); background:transparent; color:var(--ink); font-size:12.5px}
+  .st.active{background:var(--gold-a); color:var(--gold-ink); border-color:var(--gold-a); font-weight:600}
+  .st:disabled{opacity:.5}
+  #toast{position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px);
+    background:#2C2C2E; color:var(--ink); padding:11px 16px; border-radius:12px; font-size:14px; opacity:0;
+    transition:opacity .2s, transform .2s; pointer-events:none; max-width:calc(100% - 32px); text-align:center; z-index:10}
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  @media (prefers-reduced-motion: reduce){#toast{transition:none} #refresh.spin svg{animation:none}}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h1>🏗️ Sites Vitrine</h1>
+  <p>Espace vendeur. Entre le code d’accès reçu par SMS.</p>
+  <input id="login-code" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="vend-…">
+  <button id="login-go" type="button">Entrer</button>
+  <div id="login-err" role="alert"></div>
+</div>
+
+<div id="app">
+  <div id="head">
+    <b>🏗️ Sites Vitrine</b>
+    <button id="refresh" class="hbtn" type="button" aria-label="Actualiser"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 10a7 7 0 1 1-2-4.9M17 3v4h-4"/></svg></button>
+    <button id="logout" class="hbtn" type="button" aria-label="Se déconnecter">⎋</button>
+  </div>
+  <div id="tabs">
+    <button class="tab active" data-tab="nouveaux" type="button">🆕 À appeler<span class="n"></span></button>
+    <button class="tab" data-tab="encours" type="button">📞 En cours<span class="n"></span></button>
+    <button class="tab" data-tab="clients" type="button">✅ Clients<span class="n"></span></button>
+    <button class="tab" data-tab="perdus" type="button">❌ Perdus<span class="n"></span></button>
+  </div>
+  <div id="list"></div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  'use strict';
+  var API = 'https://n8n-self-hosted-t0pz.onrender.com/webhook/vitrine-vendeur';
+  var CLE = 'vitrineVendeurCode';
+
+  function lire(){ try { return localStorage.getItem(CLE) || ''; } catch(e){ return ''; } }
+  function ecrire(v){ try { if (v) localStorage.setItem(CLE, v); else localStorage.removeItem(CLE); } catch(e){} }
+
+  var toastEl = document.getElementById('toast'), toastT = null;
+  function toast(msg){
+    toastEl.textContent = msg; toastEl.classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(function(){ toastEl.classList.remove('show'); }, 3200);
+  }
+  function el(tag, cls, txt){
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+
+  // Tout passe par ici : le code est relu a chaque appel, jamais mis dans l'adresse de la page.
+  function post(payload, onOk, onErr){
+    payload.code = lire().trim();
+    fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || j.ok === false){
+          var msg = (j && j.erreur) || 'Erreur.';
+          if (msg === 'Code invalide.') { deconnecter(msg); return; }
+          onErr(msg);
+        } else { onOk(j); }
+      })
+      .catch(function(){ onErr('Connexion impossible. Vérifie le réseau et réessaie.'); });
+  }
+
+  // ---------- Connexion ----------
+  var loginEl = document.getElementById('login'), appEl = document.getElementById('app');
+  var loginCode = document.getElementById('login-code'), loginGo = document.getElementById('login-go');
+  var loginErr = document.getElementById('login-err');
+
+  function deconnecter(msg){
+    ecrire('');
+    appEl.classList.remove('open'); loginEl.style.display = 'flex';
+    loginGo.disabled = false; loginGo.textContent = 'Entrer';
+    loginErr.textContent = msg || '';
+    loginCode.value = '';
+  }
+  function entrer(){
+    var c = loginCode.value.trim().toLowerCase();
+    if (!c){ loginErr.textContent = 'Entre ton code.'; return; }
+    loginGo.disabled = true; loginGo.textContent = '…'; loginErr.textContent = '';
+    ecrire(c);
+    charger(function(){
+      loginEl.style.display = 'none'; appEl.classList.add('open');
+    }, function(err){
+      ecrire(''); loginGo.disabled = false; loginGo.textContent = 'Entrer'; loginErr.textContent = err;
+    });
+  }
+  loginGo.addEventListener('click', entrer);
+  loginCode.addEventListener('keydown', function(e){ if (e.key === 'Enter') entrer(); });
+  document.getElementById('logout').addEventListener('click', function(){
+    if (confirm('Se déconnecter de cet appareil ?')) deconnecter('');
+  });
+
+  // ---------- Cockpit ----------
+  var listEl = document.getElementById('list');
+  var tous = [], ongletActif = 'nouveaux';
+  var STATUTS = [
+    { v:'a_appeler', label:'À appeler' }, { v:'appele', label:'Appelé' }, { v:'achete', label:'Acheté' },
+    { v:'a_relancer', label:'À relancer' }, { v:'perdu', label:'Perdu' }
+  ];
+  // Memes cles et prix que le catalogue cote serveur (noeud « Preparer devis » du cockpit) :
+  // le serveur ignore toute cle inconnue et reprend ses propres prix.
+  var OPTIONS_DEVIS = [
+    { cle:'base_1_page', titre:'Site web professionnel (1 page)', prix:490 },
+    { cle:'page_supp', titre:'Page supplémentaire', prix:250, qte:true },
+    { cle:'google_business', titre:'Fiche Google Business', prix:199 },
+    { cle:'devis_interactif', titre:'Formulaire de devis interactif', prix:129 },
+    { cle:'logo', titre:'Logo / identité visuelle', prix:219 },
+    { cle:'galerie_avancee', titre:'Galerie de réalisations avancée', prix:99 },
+    { cle:'email_pro', titre:'Adresses email pro', prix:49 },
+    { cle:'avis_widget', titre:'Avis Google intégrés (widget)', prix:49 },
+    { cle:'rdv_ligne', titre:'Prise de rendez-vous en ligne', prix:149 },
+    { cle:'reseaux_sociaux', titre:'Réseaux sociaux (pages pro)', prix:99 },
+    { cle:'badges_confiance', titre:'Badges de confiance BTP', prix:49 },
+    { cle:'multilingue', titre:'Multilingue (par langue)', prix:149 }
+  ];
+  var ONGLETS = {
+    nouveaux: function(s){ return !s.statut_vente || s.statut_vente === 'a_appeler'; },
+    encours: function(s){ return s.statut_vente === 'appele' || s.statut_vente === 'mail_envoye' || s.statut_vente === 'a_relancer'; },
+    clients: function(s){ return s.statut_vente === 'achete'; },
+    perdus: function(s){ return s.statut_vente === 'perdu'; }
+  };
+
+  function carte(s){
+    var card = el('div', 'card');
+    card.appendChild(el('span', 'nom', s.entreprise || ''));
+    var bits = [s.secteur, s.ville].filter(Boolean);
+    if (bits.length) card.appendChild(el('span', 'meta', bits.join(' · ')));
+
+    var actions = el('div', 'actions');
+    if (s.telephone){
+      var tel = el('a', 'tel', '📞 ' + s.telephone);
+      tel.href = 'tel:' + String(s.telephone).replace(/\s+/g, '');
+      actions.appendChild(tel);
+    }
+    if (s.supprime){
+      actions.appendChild(el('span', 'muted', '🗑 Site supprimé (prospect perdu)'));
+    } else if (s.expire){
+      actions.appendChild(el('span', 'muted', 'Démo à réactiver : demande à Mathéo'));
+    } else if (s.url_demo){
+      var a = el('a', 'demo', '👁 Voir la démo');
+      a.href = s.url_demo; a.target = '_blank'; a.rel = 'noopener';
+      actions.appendChild(a);
+    }
+    card.appendChild(actions);
+    if (s.expire && !s.supprime) card.appendChild(el('span', 'expired', '⏱ Démo expirée : le lien ne marche plus'));
+
+    // Note libre (visible en clair, pour se souvenir de l'appel avant de rappeler)
+    var nb = el('div', 'box');
+    var np = el('button', s.notes ? 'note' : 'note vide', s.notes ? ('📝 ' + s.notes) : '📝 Ajouter une note');
+    np.type = 'button';
+    var nf = el('div', 'fields');
+    var na = el('textarea'); na.rows = 3; na.placeholder = 'Ce que le client a dit, à se rappeler pour la prochaine fois…'; na.value = s.notes || '';
+    var ns = el('button', 'go', '✅ Enregistrer'); ns.type = 'button';
+    nf.appendChild(na); nf.appendChild(ns);
+    np.addEventListener('click', function(){ nf.classList.toggle('open'); if (nf.classList.contains('open')) na.focus(); });
+    ns.addEventListener('click', function(){
+      var val = na.value.trim();
+      ns.disabled = true; ns.textContent = '…';
+      post({ type:'notes', place_id:s.place_id, notes:val }, function(){
+        s.notes = val;
+        np.className = val ? 'note' : 'note vide';
+        np.textContent = val ? ('📝 ' + val) : '📝 Ajouter une note';
+        nf.classList.remove('open'); ns.disabled = false; ns.textContent = '✅ Enregistrer';
+        toast('✅ Note enregistrée');
+      }, function(err){ ns.disabled = false; ns.textContent = '✅ Enregistrer'; toast(err); });
+    });
+    nb.appendChild(np); nb.appendChild(nf); card.appendChild(nb);
+
+    // Mail pre-redige : relu et modifiable avant envoi, jamais envoye tout seul
+    var deja = s.statut_vente === 'mail_envoye';
+    var mb = el('div', 'box');
+    var mt = el('button', 'toggle', deja ? '✉️ Revoir / renvoyer le mail' : '✉️ Voir le mail à envoyer'); mt.type = 'button';
+    var mf = el('div', 'fields');
+    var me = el('input'); me.type = 'email'; me.placeholder = 'Email du contact'; me.value = s.email || '';
+    var mo = el('input'); mo.type = 'text'; mo.placeholder = 'Objet'; mo.value = s.mail_objet || '';
+    var mc = el('textarea'); mc.rows = 8; mc.value = s.mail_corps || '';
+    var ms = el('button', 'go', deja ? '✉️ Renvoyer le mail' : '✉️ Envoyer le mail'); ms.type = 'button';
+    mf.appendChild(me); mf.appendChild(mo); mf.appendChild(mc); mf.appendChild(ms);
+    if (deja) mf.appendChild(el('span', 'done', '✅ Mail déjà envoyé'));
+    mt.addEventListener('click', function(){ mf.classList.toggle('open'); });
+    ms.addEventListener('click', function(){
+      var em = me.value.trim();
+      if (!em){ toast('Indique une adresse email d’abord.'); return; }
+      ms.disabled = true; ms.textContent = '…';
+      post({ type:'envoyer_mail', place_id:s.place_id, email:em, objet:mo.value.trim(), corps:mc.value.trim() }, function(){
+        toast('✅ Mail envoyé'); rafraichir();
+      }, function(err){ ms.disabled = false; ms.textContent = deja ? '✉️ Renvoyer le mail' : '✉️ Envoyer le mail'; toast(err); });
+    });
+    mb.appendChild(mt); mb.appendChild(mf); card.appendChild(mb);
+
+    // Devis : options cochees au telephone -> lien de paiement Shopify a copier
+    var db = el('div', 'box');
+    var dt = el('button', 'toggle', s.devis_url ? '🧾 Revoir le devis' : '🧾 Créer un devis'); dt.type = 'button';
+    var df = el('div', 'fields');
+    var cases = [];
+    OPTIONS_DEVIS.forEach(function(o){
+      var row = el('label', 'opt');
+      var chk = el('input'); chk.type = 'checkbox';
+      row.appendChild(chk); row.appendChild(el('span', 't', o.titre)); row.appendChild(el('span', 'p', o.prix + ' €'));
+      var q = null;
+      if (o.qte){ q = el('input', 'q'); q.type = 'number'; q.min = '1'; q.value = '1'; q.setAttribute('aria-label', 'Nombre de pages'); row.appendChild(q); }
+      df.appendChild(row); cases.push({ cle:o.cle, chk:chk, q:q });
+    });
+    var lr = el('div', 'libre');
+    var lt = el('input'); lt.type = 'text'; lt.placeholder = 'Autre / sur devis (ex : vidéo drone)';
+    var lp = el('input'); lp.type = 'number'; lp.min = '0'; lp.placeholder = '€';
+    lr.appendChild(lt); lr.appendChild(lp); df.appendChild(lr);
+    var dg = el('button', 'go', 'Générer le lien de paiement'); dg.type = 'button'; df.appendChild(dg);
+    var dr = el('div', 'result'); var du = el('span'); var dc = el('button', null, '📋 Copier'); dc.type = 'button';
+    dr.appendChild(du); dr.appendChild(dc); df.appendChild(dr);
+    if (s.devis_url){ du.textContent = s.devis_url; dr.classList.add('open'); }
+    dc.addEventListener('click', function(){
+      if (!du.textContent) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(du.textContent);
+      toast('📋 Lien copié');
+    });
+    dt.addEventListener('click', function(){ df.classList.toggle('open'); });
+    dg.addEventListener('click', function(){
+      var lignes = [];
+      cases.forEach(function(c){
+        if (!c.chk.checked) return;
+        var l = { cle:c.cle };
+        if (c.q){ var n = parseInt(c.q.value, 10); l.quantite = (isFinite(n) && n > 0) ? n : 1; }
+        lignes.push(l);
+      });
+      var libre = null, t = lt.value.trim(), p = parseFloat(lp.value);
+      if (t && isFinite(p) && p >= 0) libre = { titre:t, prix:p };
+      if (!lignes.length && !libre){ toast('Coche au moins une option, ou remplis la ligne libre.'); return; }
+      dg.disabled = true; dg.textContent = '…';
+      var payload = { type:'devis', place_id:s.place_id, lignes:lignes };
+      if (libre) payload.ligne_libre = libre;
+      post(payload, function(r){
+        dg.disabled = false; dg.textContent = 'Générer le lien de paiement';
+        du.textContent = r.devis_url || ''; dr.classList.add('open'); dt.textContent = '🧾 Revoir le devis';
+        toast('✅ Devis créé (' + (r.total || '') + ' €) : lien prêt à copier');
+        rafraichir();
+      }, function(err){ dg.disabled = false; dg.textContent = 'Générer le lien de paiement'; toast(err); });
+    });
+    db.appendChild(dt); db.appendChild(df); card.appendChild(db);
+
+    // Statut de vente. « Perdu » supprime le site : deuxieme appui obligatoire.
+    var sa = el('div', 'statuts');
+    STATUTS.forEach(function(st){
+      var b = el('button', 'st' + ((s.statut_vente || 'a_appeler') === st.v ? ' active' : ''), st.label); b.type = 'button';
+      if (st.v === 'perdu'){
+        var arme = false;
+        b.addEventListener('click', function(){
+          if (!arme){
+            arme = true; b.textContent = '⚠️ Sûr ? (supprime le site)';
+            setTimeout(function(){ if (arme){ arme = false; b.textContent = st.label; } }, 4000);
+            return;
+          }
+          arme = false; b.disabled = true; b.textContent = '…';
+          post({ type:'statut', place_id:s.place_id, statut_vente:'perdu' }, function(){
+            toast('🗑 Prospect marqué perdu, site supprimé'); rafraichir();
+          }, function(err){ b.disabled = false; b.textContent = st.label; toast(err); });
+        });
+      } else {
+        b.addEventListener('click', function(){
+          b.disabled = true;
+          post({ type:'statut', place_id:s.place_id, statut_vente:st.v }, function(){ rafraichir(); },
+            function(err){ b.disabled = false; toast(err); });
+        });
+      }
+      sa.appendChild(b);
+    });
+    card.appendChild(sa);
+    return card;
+  }
+
+  function afficher(){
+    document.querySelectorAll('.tab').forEach(function(b){
+      var n = tous.filter(ONGLETS[b.dataset.tab]).length;
+      b.querySelector('.n').textContent = n ? '(' + n + ')' : '';
+    });
+    listEl.innerHTML = '';
+    var sites = tous.filter(ONGLETS[ongletActif] || ONGLETS.nouveaux);
+    if (!sites.length){ listEl.appendChild(el('p', 'empty', 'Rien ici pour l’instant.')); return; }
+    sites.forEach(function(s){ listEl.appendChild(carte(s)); });
+  }
+
+  function charger(onOk, onErr){
+    post({ type:'list' }, function(j){
+      tous = j.sites || []; afficher(); if (onOk) onOk();
+    }, function(err){ if (onErr) onErr(err); else toast(err); });
+  }
+  function rafraichir(onDone){
+    charger(onDone, function(err){ toast(err); if (onDone) onDone(); });
+  }
+
+  var refreshBtn = document.getElementById('refresh');
+  refreshBtn.addEventListener('click', function(){
+    if (refreshBtn.classList.contains('spin')) return;
+    refreshBtn.classList.add('spin');
+    rafraichir(function(){ refreshBtn.classList.remove('spin'); });
+  });
+  document.querySelectorAll('.tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      ongletActif = btn.dataset.tab; afficher();
+    });
+  });
+
+  // Au demarrage : si un code est deja garde sur l'appareil, on entre directement.
+  if (lire()){
+    loginEl.style.display = 'none'; appEl.classList.add('open');
+    listEl.appendChild(el('p', 'empty', 'Chargement…'));
+    charger(null, function(err){ listEl.innerHTML = ''; listEl.appendChild(el('p', 'empty', err)); });
+  } else {
+    loginCode.focus();
+  }
+})();
+</script>
+</body>
+</html>
